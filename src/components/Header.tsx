@@ -47,6 +47,7 @@ export async function Header() {
           <Link href="/certifications">종목 명칭</Link>
           <Link href="/eligibility">응시자격 자가진단</Link>
           <Link href="/notices">공지</Link>
+          <Link href="/criteria">출제기준</Link>
           <Link href="/apply">원서 접수</Link>
           <Link href="/certificate/verify">진위확인</Link>
           <Link href="/chat">1:1 상담</Link>

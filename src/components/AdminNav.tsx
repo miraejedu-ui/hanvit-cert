@@ -2,10 +2,10 @@ import Link from "next/link";
 
 const links = [
   { href: "/admin", label: "대시보드" },
-  { href: "/admin/majors", label: "자가진단 기초정보" },
+  { href: "/admin/majors", label: "기본 정보" },
   { href: "/admin/certifications", label: "종목 등록" },
   { href: "/admin/notices", label: "공지 작성" },
-  { href: "/admin/criteria", label: "출제기준" },
+  { href: "/admin/criteria", label: "출제영역" },
   { href: "/admin/applications", label: "원서 검토" },
   { href: "/admin/exams", label: "시험 제작" },
   { href: "/admin/grading", label: "채점/결과" },

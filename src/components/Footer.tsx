@@ -19,6 +19,7 @@ export function Footer() {
         </p>
         <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", fontSize: "0.9rem" }}>
           <Link href="/certifications">종목 명칭</Link>
+          <Link href="/criteria">출제기준</Link>
           <Link href="/notices">공지사항</Link>
           <Link href="/certificate/verify">진위확인서</Link>
           <Link href="/chat">1:1 상담</Link>

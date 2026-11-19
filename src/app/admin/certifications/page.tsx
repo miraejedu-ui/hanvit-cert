@@ -126,7 +126,7 @@ export default function AdminCertsPage() {
         )}
         {(
           [
-            ["name", "자격증명"],
+            ["name", "종목명"],
             ["organization", "주관교육기관"],
             ["relatedMajors", "관련 전공 (쉼표)"],
             ["jobFields", "직무 분야 (쉼표)"],

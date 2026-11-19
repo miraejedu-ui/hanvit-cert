@@ -12,7 +12,7 @@ import { getSupabase, UPLOAD_BUCKET } from "./supabase";
 const JSON_STORE_ID = "hcai";
 const LEGACY_STORE_ID = "main";
 /** Bump to force re-import from legacy site_store main */
-const STORE_VERSION = 2;
+const STORE_VERSION = 3;
 
 type Backend = "relational" | "json";
 let backend: Backend | null = null;
@@ -189,37 +189,40 @@ function importLegacy(main: Record<string, unknown>): StoredDb {
     }
   }
 
-  const departments = Array.isArray(main.departments) ? main.departments : [];
-  db.majors = departments.map((d, i) => {
-    if (typeof d === "string") {
-      return { id: `major-${i + 1}`, name: d, relatedJobs: [] as string[] };
-    }
-    const obj = d as Record<string, unknown>;
-    return {
-      id: String(obj.id ?? `major-${i + 1}`),
-      name: String(obj.name ?? ""),
-      relatedJobs: Array.isArray(obj.relatedJobs)
-        ? obj.relatedJobs.map(String)
-        : String(obj.majors || "")
-            .split(/[,，]/)
-            .map((s) => s.trim())
-            .filter(Boolean),
-    };
-  });
-
+  // Legacy jobs: { name, majors: "전공A,전공B", similar: "유사직무…" }
+  // departments are 주관교육기관 names — NOT majors
   const jobs = Array.isArray(main.jobs) ? main.jobs : [];
+  const splitCsv = (v: unknown) =>
+    String(v || "")
+      .split(/[,，]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
   db.jobFields = jobs.map((j, i) => {
     const obj = j as Record<string, unknown>;
-    const similar = String(obj.similar || "");
     return {
       id: String(obj.id ?? `job-${i + 1}`),
       name: String(obj.name ?? ""),
-      similarJobs: similar
-        .split(/[,，]/)
-        .map((s) => s.trim())
-        .filter(Boolean),
+      relatedMajors: splitCsv(obj.majors),
+      similarJobs: splitCsv(obj.similar),
     };
   });
+
+  // Invert job→majors into major→relatedJobs (자가진단용)
+  const majorToJobs = new Map<string, Set<string>>();
+  for (const jf of db.jobFields) {
+    for (const majorName of jf.relatedMajors) {
+      if (!majorToJobs.has(majorName)) majorToJobs.set(majorName, new Set());
+      majorToJobs.get(majorName)!.add(jf.name);
+    }
+  }
+  db.majors = [...majorToJobs.entries()].map(([name, jobSet], i) => ({
+    id: `major-${i + 1}`,
+    name,
+    relatedJobs: [...jobSet],
+  }));
+
+  const jobById = new Map(db.jobFields.map((j) => [j.id, j]));
   const jobNameById = new Map(db.jobFields.map((j) => [j.id, j.name]));
 
   const quals = Array.isArray(main.qualifications) ? main.qualifications : [];
@@ -228,16 +231,20 @@ function importLegacy(main: Record<string, unknown>): StoredDb {
     const id = String(q.id ?? uuid());
     const subjects = Array.isArray(q.subjects) ? q.subjects.map(String) : [];
     const jobIds = Array.isArray(q.jobIds) ? q.jobIds.map(String) : [];
-    const jobNames = jobIds
-      .map((jid) => jobNameById.get(jid) || jobNameById.get(String(Number(jid))) || "")
+    const linkedJobs = jobIds
+      .map((jid) => jobById.get(jid) || jobById.get(String(Number(jid))))
       .filter(Boolean);
+    const jobNames = linkedJobs.map((j) => j!.name);
+    const relatedMajors = [
+      ...new Set(linkedJobs.flatMap((j) => j!.relatedMajors)),
+    ];
 
     db.certifications.push({
       id,
       name: String(q.name ?? ""),
       organization: String(q.department ?? ""),
-      relatedMajors: [],
-      jobFields: jobNames.length ? jobNames : jobIds,
+      relatedMajors,
+      jobFields: jobNames.length ? jobNames : jobIds.map((jid) => jobNameById.get(jid) || jid),
       subjects,
       passCriteria: String(q.passing ?? ""),
       overview: String(q.trend ?? ""),
@@ -365,18 +372,41 @@ function importLegacy(main: Record<string, unknown>): StoredDb {
 
 async function loadLegacyAndSave(): Promise<StoredDb> {
   const sb = getSupabase();
-  const legacy = await sb
-    .from("site_store")
-    .select("data")
-    .eq("id", LEGACY_STORE_ID)
-    .maybeSingle();
+  const [legacy, existingRes] = await Promise.all([
+    sb.from("site_store").select("data").eq("id", LEGACY_STORE_ID).maybeSingle(),
+    sb.from("site_store").select("data").eq("id", JSON_STORE_ID).maybeSingle(),
+  ]);
   if (legacy.error) throw legacy.error;
+  if (existingRes.error) throw existingRes.error;
 
   const imported =
     legacy.data?.data && typeof legacy.data.data === "object"
       ? importLegacy(legacy.data.data as Record<string, unknown>)
       : (emptyDb() as StoredDb);
   imported._storeVersion = STORE_VERSION;
+
+  const prev = existingRes.data?.data as StoredDb | undefined;
+  if (prev && typeof prev === "object") {
+    // Keep operational records not present in legacy qualifications dump
+    imported.authenticity = prev.authenticity || [];
+    imported.chatRooms = prev.chatRooms || [];
+    imported.chatMessages = prev.chatMessages || [];
+    imported.issuedCertificates = prev.issuedCertificates || [];
+    imported.certificateRequests = prev.certificateRequests || [];
+    imported.exams = prev.exams || [];
+    imported.attempts = prev.attempts || [];
+
+    const mainCertIds = new Set(imported.certifications.map((c) => c.id));
+    const extraCerts = (prev.certifications || []).filter((c) => !mainCertIds.has(c.id));
+    imported.certifications.push(...extraCerts);
+    const mainCriteriaIds = new Set(imported.criteria.map((c) => c.id));
+    imported.criteria.push(
+      ...(prev.criteria || []).filter(
+        (c) => !mainCriteriaIds.has(c.id) && (extraCerts.some((x) => x.id === c.certificationId) || !mainCertIds.has(c.certificationId))
+      )
+    );
+  }
+
   ensureAdminInDb(imported);
 
   const { error: upsertError } = await sb.from("site_store").upsert({
@@ -401,6 +431,11 @@ async function readJsonDb(): Promise<Database> {
     const stored = data.data as StoredDb;
     if (stored._storeVersion === STORE_VERSION) {
       const db = { ...emptyDb(), ...stored } as StoredDb;
+      db.jobFields = (db.jobFields || []).map((j) => ({
+        ...j,
+        relatedMajors: j.relatedMajors || [],
+        similarJobs: j.similarJobs || [],
+      }));
       if (ensureAdminInDb(db)) await writeJsonDb(db);
       return db;
     }
@@ -515,6 +550,7 @@ async function readRelationalDb(): Promise<Database> {
   db.jobFields = (jobFields.data || []).map((r) => ({
     id: r.id,
     name: r.name,
+    relatedMajors: r.related_majors || [],
     similarJobs: r.similar_jobs || [],
   }));
 
@@ -696,6 +732,7 @@ async function writeRelationalDb(db: Database) {
   const jobFieldsRows = db.jobFields.map((j) => ({
     id: j.id,
     name: j.name,
+    related_majors: j.relatedMajors || [],
     similar_jobs: j.similarJobs,
   }));
   const certRows = db.certifications.map((c) => ({

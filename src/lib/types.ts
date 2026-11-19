@@ -20,6 +20,8 @@ export interface Major {
 export interface JobField {
   id: string;
   name: string;
+  /** 이 직무에 연결된 전공 (예: 경영관리 → E비즈니스, 패션비즈니스 …) */
+  relatedMajors: string[];
   similarJobs: string[];
 }
 

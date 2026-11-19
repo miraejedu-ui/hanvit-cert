@@ -20,15 +20,23 @@ export async function POST(req: Request) {
   const db = await readDb();
 
   if (body.type === "major") {
+    const relatedJobs = String(body.relatedJobs || "")
+      .split(",")
+      .map((s: string) => s.trim())
+      .filter(Boolean);
     const major = {
       id: uuid(),
       name: String(body.name || ""),
-      relatedJobs: String(body.relatedJobs || "")
-        .split(",")
-        .map((s: string) => s.trim())
-        .filter(Boolean),
+      relatedJobs,
     };
     db.majors.push(major);
+    for (const jobName of relatedJobs) {
+      const job = db.jobFields.find((j) => j.name === jobName);
+      if (job) {
+        job.relatedMajors = job.relatedMajors || [];
+        if (!job.relatedMajors.includes(major.name)) job.relatedMajors.push(major.name);
+      }
+    }
     await writeDb(db);
     return NextResponse.json({ major });
   }
@@ -48,15 +56,32 @@ export async function POST(req: Request) {
     return NextResponse.json({ eligibilityPreset: preset });
   }
 
+  const relatedMajors = String(body.relatedMajors || "")
+    .split(",")
+    .map((s: string) => s.trim())
+    .filter(Boolean);
   const job = {
     id: uuid(),
     name: String(body.name || ""),
+    relatedMajors,
     similarJobs: String(body.similarJobs || "")
       .split(",")
       .map((s: string) => s.trim())
       .filter(Boolean),
   };
   db.jobFields.push(job);
+
+  // Keep major ↔ job links in sync when registering from 직무 side
+  for (const majorName of relatedMajors) {
+    let major = db.majors.find((m) => m.name === majorName);
+    if (!major) {
+      major = { id: uuid(), name: majorName, relatedJobs: [job.name] };
+      db.majors.push(major);
+    } else if (!major.relatedJobs.includes(job.name)) {
+      major.relatedJobs.push(job.name);
+    }
+  }
+
   await writeDb(db);
   return NextResponse.json({ jobField: job });
 }
