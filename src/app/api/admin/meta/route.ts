@@ -30,6 +30,10 @@ export async function POST(req: Request) {
   const job = {
     id: uuid(),
     name: String(body.name || ""),
+    relatedMajors: String(body.relatedMajors || "")
+      .split(",")
+      .map((s: string) => s.trim())
+      .filter(Boolean),
     similarJobs: String(body.similarJobs || "")
       .split(",")
       .map((s: string) => s.trim())
