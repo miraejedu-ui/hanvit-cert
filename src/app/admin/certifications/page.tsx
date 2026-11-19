@@ -108,7 +108,7 @@ export default function AdminCertsPage() {
 
   return (
     <div className="container">
-      <h1 className="page-title">자격증 정보 등록</h1>
+      <h1 className="page-title">종목 등록</h1>
       <p className="page-desc">
         주관교육기관, 관련 전공, 시험과목, 합격기준, 개요, 수행직무, 진로 및 전망을 등록합니다.
         목록 항목을 클릭하면 수정할 수 있습니다.

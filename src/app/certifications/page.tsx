@@ -31,7 +31,7 @@ export default function CertificationsPage() {
 
   return (
     <div className="container">
-      <h1 className="page-title">자격증 정보</h1>
+      <h1 className="page-title">종목 명칭</h1>
       <p className="page-desc">검색, 주관교육기관별, 직무능력별로 자격증을 확인할 수 있습니다.</p>
 
       <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>

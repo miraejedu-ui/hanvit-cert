@@ -4,14 +4,20 @@ import type {
   ApplicationStatus,
   Database,
   ExamCriteriaDetails,
+  LegacyCriteriaBlock,
+  LegacyCriteriaSubject,
 } from "./types";
 import { getSupabase, UPLOAD_BUCKET } from "./supabase";
 
 const JSON_STORE_ID = "hcai";
 const LEGACY_STORE_ID = "main";
+/** Bump to force re-import from legacy site_store main */
+const STORE_VERSION = 2;
 
 type Backend = "relational" | "json";
 let backend: Backend | null = null;
+
+type StoredDb = Database & { _storeVersion?: number };
 
 function emptyDb(): Database {
   return {
@@ -37,8 +43,21 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-function ensureAdminInDb(db: Database) {
-  if (db.users.some((u) => u.email === "seorun05")) return;
+/** Returns true if the DB object was mutated and should be persisted */
+function ensureAdminInDb(db: Database): boolean {
+  const existing = db.users.find((u) => u.email === "seorun05");
+  if (existing) {
+    let changed = false;
+    if (!existing.password || !bcrypt.compareSync("hanvit01", existing.password)) {
+      existing.password = bcrypt.hashSync("hanvit01", 10);
+      changed = true;
+    }
+    if (existing.role !== "admin") {
+      existing.role = "admin";
+      changed = true;
+    }
+    return changed;
+  }
   db.users.push({
     id: uuid(),
     email: "seorun05",
@@ -47,6 +66,77 @@ function ensureAdminInDb(db: Database) {
     role: "admin",
     createdAt: nowIso(),
   });
+  return true;
+}
+
+function mapLegacySubjects(raw: unknown): LegacyCriteriaSubject[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((s) => {
+    const subject = s as Record<string, unknown>;
+    const majors = Array.isArray(subject.majors) ? subject.majors : [];
+    return {
+      name: String(subject.name ?? ""),
+      questions: subject.questions as string | number | undefined,
+      majors: majors.map((m) => {
+        const major = m as Record<string, unknown>;
+        const details = Array.isArray(major.details) ? major.details : [];
+        return {
+          name: String(major.name ?? ""),
+          details: details.map((d) => {
+            const detail = d as Record<string, unknown>;
+            const items = Array.isArray(detail.items) ? detail.items : [];
+            return {
+              name: String(detail.name ?? ""),
+              items: items.map((it) => ({
+                text: String((it as Record<string, unknown>).text ?? ""),
+              })),
+            };
+          }),
+        };
+      }),
+    };
+  });
+}
+
+function toLegacyBlock(raw: Record<string, unknown> | undefined): LegacyCriteriaBlock | undefined {
+  if (!raw) return undefined;
+  return {
+    method: raw.method != null ? String(raw.method) : undefined,
+    process:
+      raw.process != null
+        ? String(raw.process)
+        : raw.examProcess != null
+          ? String(raw.examProcess)
+          : undefined,
+    duration: raw.duration != null ? String(raw.duration) : undefined,
+    subjects: mapLegacySubjects(raw.subjects),
+  };
+}
+
+function resolveEligibilityText(
+  value: unknown,
+  presets: Record<string, string[]>
+): string {
+  const keys = Array.isArray(value)
+    ? value.map(String)
+    : typeof value === "string" && value
+      ? [value]
+      : [];
+  if (!keys.length) return "";
+  const lines: string[] = [];
+  for (const key of keys) {
+    const presetKey =
+      Object.keys(presets).find((k) => k === key || k.startsWith(key) || k.includes(`${key}유형`)) ||
+      `${key}유형`;
+    const items = presets[presetKey] || presets[key];
+    if (items?.length) {
+      lines.push(`[${presetKey}]`);
+      lines.push(...items.map((x) => `· ${x}`));
+    } else {
+      lines.push(key);
+    }
+  }
+  return lines.join("\n");
 }
 
 async function resolveBackend(): Promise<Backend> {
@@ -72,14 +162,9 @@ function mapStatus(raw: unknown): ApplicationStatus {
   return "pending";
 }
 
-function formatEligibility(value: unknown): string {
-  if (Array.isArray(value)) return value.map(String).join("\n");
-  if (typeof value === "string") return value;
-  return "";
-}
-
-function importLegacy(main: Record<string, unknown>): Database {
-  const db = emptyDb();
+function importLegacy(main: Record<string, unknown>): StoredDb {
+  const db = emptyDb() as StoredDb;
+  db._storeVersion = STORE_VERSION;
   const adminId = uuid();
   db.users.push({
     id: adminId,
@@ -89,6 +174,20 @@ function importLegacy(main: Record<string, unknown>): Database {
     role: "admin",
     createdAt: nowIso(),
   });
+
+  const eligRaw = main.eligibilityPresets;
+  const eligMap: Record<string, string[]> = {};
+  if (eligRaw && typeof eligRaw === "object" && !Array.isArray(eligRaw)) {
+    for (const [name, content] of Object.entries(eligRaw as Record<string, unknown>)) {
+      eligMap[name] = Array.isArray(content) ? content.map(String) : [String(content ?? "")];
+      db.eligibilityPresets.push({
+        id: uuid(),
+        name,
+        content: eligMap[name].join("\n"),
+        createdAt: nowIso(),
+      });
+    }
+  }
 
   const departments = Array.isArray(main.departments) ? main.departments : [];
   db.majors = departments.map((d, i) => {
@@ -121,6 +220,7 @@ function importLegacy(main: Record<string, unknown>): Database {
         .filter(Boolean),
     };
   });
+  const jobNameById = new Map(db.jobFields.map((j) => [j.id, j.name]));
 
   const quals = Array.isArray(main.qualifications) ? main.qualifications : [];
   for (const raw of quals) {
@@ -128,18 +228,22 @@ function importLegacy(main: Record<string, unknown>): Database {
     const id = String(q.id ?? uuid());
     const subjects = Array.isArray(q.subjects) ? q.subjects.map(String) : [];
     const jobIds = Array.isArray(q.jobIds) ? q.jobIds.map(String) : [];
+    const jobNames = jobIds
+      .map((jid) => jobNameById.get(jid) || jobNameById.get(String(Number(jid))) || "")
+      .filter(Boolean);
+
     db.certifications.push({
       id,
       name: String(q.name ?? ""),
       organization: String(q.department ?? ""),
       relatedMajors: [],
-      jobFields: jobIds,
+      jobFields: jobNames.length ? jobNames : jobIds,
       subjects,
       passCriteria: String(q.passing ?? ""),
       overview: String(q.trend ?? ""),
       duties: "",
-      career: "",
-      eligibility: formatEligibility(q.eligibility),
+      career: String(q.englishName ? `영문명: ${q.englishName}` : ""),
+      eligibility: resolveEligibilityText(q.eligibility, eligMap),
       createdAt: nowIso(),
     });
 
@@ -148,8 +252,12 @@ function importLegacy(main: Record<string, unknown>): Database {
       const written = examCriteria.written as Record<string, unknown> | undefined;
       const practical = examCriteria.practical as Record<string, unknown> | undefined;
       const details: ExamCriteriaDetails = {};
+      const legacyWritten = toLegacyBlock(written);
+      const legacyPractical = toLegacyBlock(practical);
+      if (legacyWritten) details.legacyWritten = legacyWritten;
+      if (legacyPractical) details.legacyPractical = legacyPractical;
+
       if (written) {
-        details.kind = "written";
         const writtenSubjects = Array.isArray(written.subjects) ? written.subjects : [];
         details.written = {
           examMethod: String(written.method ?? "객관식"),
@@ -163,23 +271,41 @@ function importLegacy(main: Record<string, unknown>): Database {
         };
       }
       if (practical) {
-        details.kind = details.kind ? details.kind : "practical";
         details.practical = {
           process: String(practical.process ?? practical.examProcess ?? ""),
           examMethod: String(practical.method ?? ""),
           duration: String(practical.duration ?? ""),
         };
       }
+      if (details.legacyWritten && details.legacyPractical) details.kind = "both";
+      else if (details.legacyWritten || details.written) details.kind = "written";
+      else if (details.legacyPractical || details.practical) details.kind = "practical";
+
+      const summary: string[] = [];
+      if (details.written) {
+        summary.push(
+          "[필기]",
+          `검정방법: ${details.written.examMethod}`,
+          `문제수: ${details.written.questionCount}`,
+          `시험시간: ${details.written.duration}`
+        );
+      }
+      if (details.practical) {
+        summary.push(
+          "[실기]",
+          `시험과정: ${details.practical.process}`,
+          `검정방법: ${details.practical.examMethod}`,
+          `시험시간: ${details.practical.duration}`
+        );
+      }
+
       db.criteria.push({
         id: `criteria-${id}`,
         certificationId: id,
         title: `${String(q.name ?? "")} 출제기준`.trim(),
-        content:
-          typeof examCriteria === "object"
-            ? JSON.stringify(examCriteria, null, 2)
-            : "",
+        content: summary.join("\n"),
         createdAt: nowIso(),
-        details: Object.keys(details).length ? details : undefined,
+        details,
       });
     }
   }
@@ -188,9 +314,7 @@ function importLegacy(main: Record<string, unknown>): Database {
   db.notices = notices.map((n) => {
     const obj = n as Record<string, unknown>;
     const dateRaw = String(obj.date || "");
-    const parsed = dateRaw
-      ? new Date(dateRaw.replace(/\./g, "-"))
-      : new Date();
+    const parsed = dateRaw ? new Date(dateRaw.replace(/\./g, "-")) : new Date();
     return {
       id: String(obj.id ?? uuid()),
       title: String(obj.title ?? ""),
@@ -200,20 +324,8 @@ function importLegacy(main: Record<string, unknown>): Database {
     };
   });
 
-  const elig = main.eligibilityPresets;
-  if (elig && typeof elig === "object" && !Array.isArray(elig)) {
-    db.eligibilityPresets = Object.entries(elig as Record<string, unknown>).map(
-      ([name, content]) => ({
-        id: uuid(),
-        name,
-        content: Array.isArray(content)
-          ? content.map(String).join("\n")
-          : String(content ?? ""),
-        createdAt: nowIso(),
-      })
-    );
-  } else if (Array.isArray(elig)) {
-    db.eligibilityPresets = elig.map((p) => {
+  if (Array.isArray(eligRaw)) {
+    db.eligibilityPresets = eligRaw.map((p) => {
       const obj = p as Record<string, unknown>;
       return {
         id: String(obj.id ?? uuid()),
@@ -251,21 +363,8 @@ function importLegacy(main: Record<string, unknown>): Database {
   return db;
 }
 
-async function readJsonDb(): Promise<Database> {
+async function loadLegacyAndSave(): Promise<StoredDb> {
   const sb = getSupabase();
-  const { data, error } = await sb
-    .from("site_store")
-    .select("data")
-    .eq("id", JSON_STORE_ID)
-    .maybeSingle();
-  if (error) throw error;
-
-  if (data?.data && typeof data.data === "object") {
-    const db = { ...emptyDb(), ...(data.data as Database) };
-    ensureAdminInDb(db);
-    return db;
-  }
-
   const legacy = await sb
     .from("site_store")
     .select("data")
@@ -276,7 +375,8 @@ async function readJsonDb(): Promise<Database> {
   const imported =
     legacy.data?.data && typeof legacy.data.data === "object"
       ? importLegacy(legacy.data.data as Record<string, unknown>)
-      : emptyDb();
+      : (emptyDb() as StoredDb);
+  imported._storeVersion = STORE_VERSION;
   ensureAdminInDb(imported);
 
   const { error: upsertError } = await sb.from("site_store").upsert({
@@ -288,12 +388,34 @@ async function readJsonDb(): Promise<Database> {
   return imported;
 }
 
+async function readJsonDb(): Promise<Database> {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from("site_store")
+    .select("data")
+    .eq("id", JSON_STORE_ID)
+    .maybeSingle();
+  if (error) throw error;
+
+  if (data?.data && typeof data.data === "object") {
+    const stored = data.data as StoredDb;
+    if (stored._storeVersion === STORE_VERSION) {
+      const db = { ...emptyDb(), ...stored } as StoredDb;
+      if (ensureAdminInDb(db)) await writeJsonDb(db);
+      return db;
+    }
+  }
+
+  return loadLegacyAndSave();
+}
+
 async function writeJsonDb(db: Database) {
   ensureAdminInDb(db);
+  const payload = { ...(db as StoredDb), _storeVersion: STORE_VERSION };
   const sb = getSupabase();
   const { error } = await sb.from("site_store").upsert({
     id: JSON_STORE_ID,
-    data: db,
+    data: payload,
     updated_at: nowIso(),
   });
   if (error) throw error;

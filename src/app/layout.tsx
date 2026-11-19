@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "한빛인증평가원 | HCAI",
-  description: "Hanvit Certification & Assessment Institute — 자격증 정보 및 시험 응시",
+  description: "Hanvit Certification & Assessment Institute — 종목 정보 및 시험 응시",
 };
 
 export default function RootLayout({

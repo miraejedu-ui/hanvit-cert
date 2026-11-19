@@ -72,10 +72,37 @@ export interface ExamCriteriaPracticalDetails {
   tableRows?: string[][];
 }
 
+/** Legacy hierarchical exam-criteria tree (from older site_store qualifications) */
+export interface LegacyCriteriaItem {
+  text: string;
+}
+export interface LegacyCriteriaDetail {
+  name: string;
+  items?: LegacyCriteriaItem[];
+}
+export interface LegacyCriteriaMajor {
+  name: string;
+  details?: LegacyCriteriaDetail[];
+}
+export interface LegacyCriteriaSubject {
+  name: string;
+  questions?: string | number;
+  majors?: LegacyCriteriaMajor[];
+}
+export interface LegacyCriteriaBlock {
+  method?: string;
+  process?: string;
+  duration?: string;
+  subjects?: LegacyCriteriaSubject[];
+}
+
 export interface ExamCriteriaDetails {
-  kind?: "written" | "practical";
+  kind?: "written" | "practical" | "both";
   written?: ExamCriteriaWrittenDetails;
   practical?: ExamCriteriaPracticalDetails;
+  /** Full legacy tree for table rendering */
+  legacyWritten?: LegacyCriteriaBlock;
+  legacyPractical?: LegacyCriteriaBlock;
 }
 
 export interface ExamCriteria {
