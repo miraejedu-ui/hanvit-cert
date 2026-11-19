@@ -3,7 +3,7 @@
 Hanvit Certification & Assessment Institute  
 자격증 정보 안내 및 시험 응시 사이트입니다.
 
-- 사이트: [https://hcai.vercel.app](https://hcai.vercel.app)
+- 사이트: [https://hanvitcai.vercel.app](https://hanvitcai.vercel.app)
 
 ## 실행 (로컬)
 

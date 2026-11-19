@@ -67,9 +67,7 @@ git push
 5. **Deploy**
 
 완료되면 `https://프로젝트명.vercel.app` 주소가 생깁니다.  
-권장 프로젝트/도메인 이름: **`hcai`** → [https://hcai.vercel.app](https://hcai.vercel.app)
-
-이미 `hanvit-cert` 등으로 배포된 경우: Vercel → Project → **Settings → General → Project Name**을 `hcai`로 변경하면 주소가 `https://hcai.vercel.app`로 바뀝니다.
+현재 사이트 주소: [https://hanvitcai.vercel.app](https://hanvitcai.vercel.app) (프로젝트명 `hcai`)
 
 ## 8. 이후 업데이트
 
