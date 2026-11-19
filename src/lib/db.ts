@@ -1,7 +1,17 @@
 import bcrypt from "bcryptjs";
 import { v4 as uuid } from "uuid";
-import type { Database } from "./types";
+import type {
+  ApplicationStatus,
+  Database,
+  ExamCriteriaDetails,
+} from "./types";
 import { getSupabase, UPLOAD_BUCKET } from "./supabase";
+
+const JSON_STORE_ID = "hcai";
+const LEGACY_STORE_ID = "main";
+
+type Backend = "relational" | "json";
+let backend: Backend | null = null;
 
 function emptyDb(): Database {
   return {
@@ -23,7 +33,273 @@ function emptyDb(): Database {
   };
 }
 
-async function ensureAdmin() {
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function ensureAdminInDb(db: Database) {
+  if (db.users.some((u) => u.email === "seorun05")) return;
+  db.users.push({
+    id: uuid(),
+    email: "seorun05",
+    password: bcrypt.hashSync("hanvit01", 10),
+    name: "관리자",
+    role: "admin",
+    createdAt: nowIso(),
+  });
+}
+
+async function resolveBackend(): Promise<Backend> {
+  if (backend) return backend;
+  const sb = getSupabase();
+  const { error } = await sb.from("users").select("id").limit(1);
+  if (error && (error.code === "PGRST205" || /Could not find the table/i.test(error.message))) {
+    backend = "json";
+  } else if (error) {
+    // Prefer json store when schema is missing/misconfigured
+    backend = "json";
+  } else {
+    backend = "relational";
+  }
+  return backend;
+}
+
+function mapStatus(raw: unknown): ApplicationStatus {
+  const s = String(raw || "");
+  if (s.includes("승인") || s === "approved") return "approved";
+  if (s.includes("보완") || s === "supplement") return "supplement";
+  if (s.includes("반려") || s.includes("거절") || s === "rejected") return "rejected";
+  return "pending";
+}
+
+function formatEligibility(value: unknown): string {
+  if (Array.isArray(value)) return value.map(String).join("\n");
+  if (typeof value === "string") return value;
+  return "";
+}
+
+function importLegacy(main: Record<string, unknown>): Database {
+  const db = emptyDb();
+  const adminId = uuid();
+  db.users.push({
+    id: adminId,
+    email: "seorun05",
+    password: bcrypt.hashSync("hanvit01", 10),
+    name: "관리자",
+    role: "admin",
+    createdAt: nowIso(),
+  });
+
+  const departments = Array.isArray(main.departments) ? main.departments : [];
+  db.majors = departments.map((d, i) => {
+    if (typeof d === "string") {
+      return { id: `major-${i + 1}`, name: d, relatedJobs: [] as string[] };
+    }
+    const obj = d as Record<string, unknown>;
+    return {
+      id: String(obj.id ?? `major-${i + 1}`),
+      name: String(obj.name ?? ""),
+      relatedJobs: Array.isArray(obj.relatedJobs)
+        ? obj.relatedJobs.map(String)
+        : String(obj.majors || "")
+            .split(/[,，]/)
+            .map((s) => s.trim())
+            .filter(Boolean),
+    };
+  });
+
+  const jobs = Array.isArray(main.jobs) ? main.jobs : [];
+  db.jobFields = jobs.map((j, i) => {
+    const obj = j as Record<string, unknown>;
+    const similar = String(obj.similar || "");
+    return {
+      id: String(obj.id ?? `job-${i + 1}`),
+      name: String(obj.name ?? ""),
+      similarJobs: similar
+        .split(/[,，]/)
+        .map((s) => s.trim())
+        .filter(Boolean),
+    };
+  });
+
+  const quals = Array.isArray(main.qualifications) ? main.qualifications : [];
+  for (const raw of quals) {
+    const q = raw as Record<string, unknown>;
+    const id = String(q.id ?? uuid());
+    const subjects = Array.isArray(q.subjects) ? q.subjects.map(String) : [];
+    const jobIds = Array.isArray(q.jobIds) ? q.jobIds.map(String) : [];
+    db.certifications.push({
+      id,
+      name: String(q.name ?? ""),
+      organization: String(q.department ?? ""),
+      relatedMajors: [],
+      jobFields: jobIds,
+      subjects,
+      passCriteria: String(q.passing ?? ""),
+      overview: String(q.trend ?? ""),
+      duties: "",
+      career: "",
+      eligibility: formatEligibility(q.eligibility),
+      createdAt: nowIso(),
+    });
+
+    const examCriteria = q.examCriteria as Record<string, unknown> | undefined;
+    if (examCriteria && typeof examCriteria === "object") {
+      const written = examCriteria.written as Record<string, unknown> | undefined;
+      const practical = examCriteria.practical as Record<string, unknown> | undefined;
+      const details: ExamCriteriaDetails = {};
+      if (written) {
+        details.kind = "written";
+        const writtenSubjects = Array.isArray(written.subjects) ? written.subjects : [];
+        details.written = {
+          examMethod: String(written.method ?? "객관식"),
+          questionCount:
+            writtenSubjects.reduce((sum: number, s) => {
+              const n = Number((s as Record<string, unknown>)?.questions ?? 0);
+              return sum + (Number.isFinite(n) ? n : 0);
+            }, 0) || "60",
+          duration: String(written.duration ?? ""),
+          questionsPerSubject: 20,
+        };
+      }
+      if (practical) {
+        details.kind = details.kind ? details.kind : "practical";
+        details.practical = {
+          process: String(practical.process ?? practical.examProcess ?? ""),
+          examMethod: String(practical.method ?? ""),
+          duration: String(practical.duration ?? ""),
+        };
+      }
+      db.criteria.push({
+        id: `criteria-${id}`,
+        certificationId: id,
+        title: `${String(q.name ?? "")} 출제기준`.trim(),
+        content:
+          typeof examCriteria === "object"
+            ? JSON.stringify(examCriteria, null, 2)
+            : "",
+        createdAt: nowIso(),
+        details: Object.keys(details).length ? details : undefined,
+      });
+    }
+  }
+
+  const notices = Array.isArray(main.notices) ? main.notices : [];
+  db.notices = notices.map((n) => {
+    const obj = n as Record<string, unknown>;
+    const dateRaw = String(obj.date || "");
+    const parsed = dateRaw
+      ? new Date(dateRaw.replace(/\./g, "-"))
+      : new Date();
+    return {
+      id: String(obj.id ?? uuid()),
+      title: String(obj.title ?? ""),
+      content: String(obj.content ?? ""),
+      authorId: adminId,
+      createdAt: Number.isNaN(parsed.getTime()) ? nowIso() : parsed.toISOString(),
+    };
+  });
+
+  const elig = main.eligibilityPresets;
+  if (elig && typeof elig === "object" && !Array.isArray(elig)) {
+    db.eligibilityPresets = Object.entries(elig as Record<string, unknown>).map(
+      ([name, content]) => ({
+        id: uuid(),
+        name,
+        content: Array.isArray(content)
+          ? content.map(String).join("\n")
+          : String(content ?? ""),
+        createdAt: nowIso(),
+      })
+    );
+  } else if (Array.isArray(elig)) {
+    db.eligibilityPresets = elig.map((p) => {
+      const obj = p as Record<string, unknown>;
+      return {
+        id: String(obj.id ?? uuid()),
+        name: String(obj.name ?? ""),
+        content: Array.isArray(obj.content)
+          ? obj.content.map(String).join("\n")
+          : String(obj.content ?? ""),
+        createdAt: String(obj.createdAt ?? nowIso()),
+      };
+    });
+  }
+
+  const apps = Array.isArray(main.applications) ? main.applications : [];
+  db.applications = apps.map((a) => {
+    const obj = a as Record<string, unknown>;
+    const cert =
+      db.certifications.find((c) => c.name === String(obj.examName ?? "")) ||
+      db.certifications[0];
+    return {
+      id: String(obj.id ?? uuid()),
+      userId: adminId,
+      certificationId: cert?.id || "",
+      name: String(obj.applicant ?? ""),
+      birthDate: "",
+      phone: "",
+      email: "",
+      documentFileName: obj.documentName ? String(obj.documentName) : undefined,
+      status: mapStatus(obj.status),
+      statusReason: obj.reviewNote ? String(obj.reviewNote) : undefined,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    };
+  });
+
+  return db;
+}
+
+async function readJsonDb(): Promise<Database> {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from("site_store")
+    .select("data")
+    .eq("id", JSON_STORE_ID)
+    .maybeSingle();
+  if (error) throw error;
+
+  if (data?.data && typeof data.data === "object") {
+    const db = { ...emptyDb(), ...(data.data as Database) };
+    ensureAdminInDb(db);
+    return db;
+  }
+
+  const legacy = await sb
+    .from("site_store")
+    .select("data")
+    .eq("id", LEGACY_STORE_ID)
+    .maybeSingle();
+  if (legacy.error) throw legacy.error;
+
+  const imported =
+    legacy.data?.data && typeof legacy.data.data === "object"
+      ? importLegacy(legacy.data.data as Record<string, unknown>)
+      : emptyDb();
+  ensureAdminInDb(imported);
+
+  const { error: upsertError } = await sb.from("site_store").upsert({
+    id: JSON_STORE_ID,
+    data: imported,
+    updated_at: nowIso(),
+  });
+  if (upsertError) throw upsertError;
+  return imported;
+}
+
+async function writeJsonDb(db: Database) {
+  ensureAdminInDb(db);
+  const sb = getSupabase();
+  const { error } = await sb.from("site_store").upsert({
+    id: JSON_STORE_ID,
+    data: db,
+    updated_at: nowIso(),
+  });
+  if (error) throw error;
+}
+
+async function ensureAdminRelational() {
   const sb = getSupabase();
   const { data, error } = await sb.from("users").select("id").eq("email", "seorun05").maybeSingle();
   if (error) throw error;
@@ -38,8 +314,8 @@ async function ensureAdmin() {
   if (insertError) throw insertError;
 }
 
-export async function readDb(): Promise<Database> {
-  await ensureAdmin();
+async function readRelationalDb(): Promise<Database> {
+  await ensureAdminRelational();
   const sb = getSupabase();
 
   const [
@@ -76,7 +352,6 @@ export async function readDb(): Promise<Database> {
     sb.from("certificate_requests").select("*"),
   ]);
 
-  // eligibility_presets may be missing until migration is applied — soft-fail
   const eligibilityOk = !eligibilityPresets.error;
   const fail = [
     users,
@@ -261,7 +536,7 @@ export async function readDb(): Promise<Database> {
   return db;
 }
 
-export async function writeDb(db: Database) {
+async function writeRelationalDb(db: Database) {
   const sb = getSupabase();
 
   const upsert = async (table: string, rows: Record<string, unknown>[]) => {
@@ -422,7 +697,6 @@ export async function writeDb(db: Database) {
     created_at: r.createdAt,
   }));
 
-  // upsert parents → children
   await upsert("users", usersRows);
   await upsert("majors", majorsRows);
   await upsert("job_fields", jobFieldsRows);
@@ -432,7 +706,6 @@ export async function writeDb(db: Database) {
   try {
     await upsert("eligibility_presets", eligibilityPresetRows);
   } catch (err) {
-    // empty sync can soft-fail before migration; non-empty must surface
     if (eligibilityPresetRows.length > 0) throw err;
   }
   await upsert("applications", appRows);
@@ -444,21 +717,14 @@ export async function writeDb(db: Database) {
   await upsert("authenticity", authRows);
   await upsert("certificate_requests", reqRows);
 
-  // delete orphans children → parents
-  await deleteMissing(
-    "certificate_requests",
-    db.certificateRequests.map((r) => r.id)
-  );
+  await deleteMissing("certificate_requests", db.certificateRequests.map((r) => r.id));
   await deleteMissing("chat_messages", db.chatMessages.map((m) => m.id));
   await deleteMissing("issued_certificates", db.issuedCertificates.map((c) => c.id));
   await deleteMissing("attempts", db.attempts.map((a) => a.id));
   await deleteMissing("applications", db.applications.map((a) => a.id));
   await deleteMissing("criteria", db.criteria.map((c) => c.id));
   try {
-    await deleteMissing(
-      "eligibility_presets",
-      db.eligibilityPresets.map((p) => p.id)
-    );
+    await deleteMissing("eligibility_presets", db.eligibilityPresets.map((p) => p.id));
   } catch {
     // table may not exist until migration is applied
   }
@@ -469,13 +735,27 @@ export async function writeDb(db: Database) {
   await deleteMissing("certifications", db.certifications.map((c) => c.id));
   await deleteMissing("majors", db.majors.map((m) => m.id));
   await deleteMissing("job_fields", db.jobFields.map((j) => j.id));
-  await deleteMissing(
-    "users",
-    db.users.map((u) => u.id)
-  );
+  await deleteMissing("users", db.users.map((u) => u.id));
 }
 
-export async function saveUpload(file: File | Buffer, originalName: string): Promise<{ fileName: string; filePath: string }> {
+export async function readDb(): Promise<Database> {
+  const mode = await resolveBackend();
+  return mode === "json" ? readJsonDb() : readRelationalDb();
+}
+
+export async function writeDb(db: Database) {
+  const mode = await resolveBackend();
+  if (mode === "json") {
+    await writeJsonDb(db);
+    return;
+  }
+  await writeRelationalDb(db);
+}
+
+export async function saveUpload(
+  file: File | Buffer,
+  originalName: string
+): Promise<{ fileName: string; filePath: string }> {
   const sb = getSupabase();
   const safe = `${Date.now()}_${originalName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
   const buffer = Buffer.isBuffer(file) ? file : Buffer.from(await file.arrayBuffer());
