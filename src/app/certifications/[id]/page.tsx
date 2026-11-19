@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { CriteriaView } from "@/components/CriteriaView";
 import { readDb } from "@/lib/db";
 import { notFound } from "next/navigation";
 
@@ -13,7 +12,7 @@ export default async function CertificationDetailPage({
   const cert = db.certifications.find((c) => c.id === id);
   if (!cert) notFound();
 
-  const criteriaList = db.criteria.filter((c) => c.certificationId === cert.id);
+  const criteria = db.criteria.find((c) => c.certificationId === cert.id);
 
   return (
     <div className="container">
@@ -23,13 +22,11 @@ export default async function CertificationDetailPage({
       <div className="card-panel" style={{ display: "grid", gap: "1rem" }}>
         <section>
           <h2 style={{ margin: "0 0 0.4rem", fontSize: "1.05rem", color: "var(--teal)" }}>자격개요</h2>
-          <p style={{ margin: 0, lineHeight: 1.7 }}>{cert.overview || "-"}</p>
+          <p style={{ margin: 0, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{cert.overview || "-"}</p>
         </section>
         <section>
           <h2 style={{ margin: "0 0 0.4rem", fontSize: "1.05rem", color: "var(--teal)" }}>응시자격</h2>
-          <p style={{ margin: 0, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
-            {cert.eligibility || "-"}
-          </p>
+          <p style={{ margin: 0, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{cert.eligibility || "-"}</p>
         </section>
         <section>
           <h2 style={{ margin: "0 0 0.4rem", fontSize: "1.05rem", color: "var(--teal)" }}>관련 전공</h2>
@@ -54,13 +51,12 @@ export default async function CertificationDetailPage({
         </section>
         <section>
           <h2 style={{ margin: "0 0 0.4rem", fontSize: "1.05rem", color: "var(--teal)" }}>수행직무</h2>
-          <p style={{ margin: 0, lineHeight: 1.7 }}>{cert.duties || "-"}</p>
+          <p style={{ margin: 0, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{cert.duties || "-"}</p>
         </section>
         <section>
           <h2 style={{ margin: "0 0 0.4rem", fontSize: "1.05rem", color: "var(--teal)" }}>진로 및 전망</h2>
-          <p style={{ margin: 0, lineHeight: 1.7 }}>{cert.career || "-"}</p>
+          <p style={{ margin: 0, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{cert.career || "-"}</p>
         </section>
-
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
           <Link href={`/apply?cert=${cert.id}`} className="btn btn-primary">
             원서 접수
@@ -68,36 +64,14 @@ export default async function CertificationDetailPage({
           <Link href="/eligibility" className="btn btn-ghost">
             응시자격 자가진단
           </Link>
-          <a href="#criteria" className="btn btn-ghost">
+          <Link
+            href={criteria ? `/criteria/${criteria.id}` : "/criteria"}
+            className="btn btn-ghost"
+          >
             출제기준 보기
-          </a>
+          </Link>
         </div>
       </div>
-
-      <section id="criteria" style={{ marginTop: "1.5rem", scrollMarginTop: "5rem" }}>
-        <h2 className="page-title" style={{ fontSize: "1.35rem" }}>
-          출제기준
-        </h2>
-        {criteriaList.length === 0 && (
-          <p className="card-panel">등록된 출제기준이 없습니다.</p>
-        )}
-        {criteriaList.map((item) => (
-          <div key={item.id} className="card-panel" style={{ marginTop: "0.75rem" }}>
-            <h3 style={{ margin: "0 0 0.85rem", color: "var(--navy)" }}>{item.title}</h3>
-            <CriteriaView item={item} />
-            {item.filePath && (
-              <p style={{ marginTop: "1.25rem" }}>
-                <a
-                  className="btn btn-accent"
-                  href={`/api/upload?file=${encodeURIComponent(item.filePath)}`}
-                >
-                  출제기준 파일 다운로드 ({item.fileName})
-                </a>
-              </p>
-            )}
-          </div>
-        ))}
-      </section>
     </div>
   );
 }

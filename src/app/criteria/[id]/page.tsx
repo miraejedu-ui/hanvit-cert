@@ -16,8 +16,8 @@ export default async function CriteriaDetailPage({
 
   return (
     <div className="container" style={{ maxWidth: 960 }}>
-      <Link href={cert ? `/certifications/${cert.id}#criteria` : "/criteria"} style={{ color: "var(--muted)", fontSize: "0.9rem" }}>
-        ← {cert ? "종목으로" : "목록"}
+      <Link href="/criteria" style={{ color: "var(--muted)", fontSize: "0.9rem" }}>
+        ← 목록
       </Link>
       <h1 className="page-title" style={{ marginTop: "0.75rem" }}>
         {item.title}
@@ -27,9 +27,7 @@ export default async function CriteriaDetailPage({
           <Link href={`/certifications/${cert.id}`} style={{ color: "var(--teal)" }}>
             {cert.name}
           </Link>
-        ) : (
-          "연결된 종목 없음"
-        )}
+        ) : null}
       </p>
       <div className="card-panel">
         <CriteriaView item={item} />

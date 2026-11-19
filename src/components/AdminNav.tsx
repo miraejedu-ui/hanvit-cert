@@ -5,7 +5,7 @@ const links = [
   { href: "/admin/majors", label: "기본 정보" },
   { href: "/admin/certifications", label: "종목 등록" },
   { href: "/admin/notices", label: "공지 작성" },
-  { href: "/admin/criteria", label: "출제영역" },
+  { href: "/admin/criteria", label: "출제기준" },
   { href: "/admin/applications", label: "원서 검토" },
   { href: "/admin/exams", label: "시험 제작" },
   { href: "/admin/grading", label: "채점/결과" },
