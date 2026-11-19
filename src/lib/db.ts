@@ -11,6 +11,7 @@ function emptyDb(): Database {
     certifications: [],
     notices: [],
     criteria: [],
+    eligibilityPresets: [],
     applications: [],
     exams: [],
     attempts: [],
@@ -48,6 +49,7 @@ export async function readDb(): Promise<Database> {
     certifications,
     notices,
     criteria,
+    eligibilityPresets,
     applications,
     exams,
     attempts,
@@ -63,6 +65,7 @@ export async function readDb(): Promise<Database> {
     sb.from("certifications").select("*"),
     sb.from("notices").select("*").order("created_at", { ascending: false }),
     sb.from("criteria").select("*"),
+    sb.from("eligibility_presets").select("*").order("created_at", { ascending: false }),
     sb.from("applications").select("*"),
     sb.from("exams").select("*"),
     sb.from("attempts").select("*"),
@@ -73,6 +76,8 @@ export async function readDb(): Promise<Database> {
     sb.from("certificate_requests").select("*"),
   ]);
 
+  // eligibility_presets may be missing until migration is applied — soft-fail
+  const eligibilityOk = !eligibilityPresets.error;
   const fail = [
     users,
     majors,
@@ -149,7 +154,20 @@ export async function readDb(): Promise<Database> {
     fileName: r.file_name || undefined,
     filePath: r.file_path || undefined,
     createdAt: r.created_at,
+    details:
+      r.details && typeof r.details === "object" && Object.keys(r.details).length > 0
+        ? r.details
+        : undefined,
   }));
+
+  db.eligibilityPresets = eligibilityOk
+    ? (eligibilityPresets.data || []).map((r) => ({
+        id: r.id,
+        name: r.name,
+        content: r.content || "",
+        createdAt: r.created_at,
+      }))
+    : [];
 
   db.applications = (applications.data || []).map((r) => ({
     id: r.id,
@@ -314,6 +332,13 @@ export async function writeDb(db: Database) {
     file_name: c.fileName ?? null,
     file_path: c.filePath ?? null,
     created_at: c.createdAt,
+    details: c.details ?? {},
+  }));
+  const eligibilityPresetRows = db.eligibilityPresets.map((p) => ({
+    id: p.id,
+    name: p.name,
+    content: p.content,
+    created_at: p.createdAt,
   }));
   const appRows = db.applications.map((a) => ({
     id: a.id,
@@ -404,6 +429,12 @@ export async function writeDb(db: Database) {
   await upsert("certifications", certRows);
   await upsert("notices", noticeRows);
   await upsert("criteria", criteriaRows);
+  try {
+    await upsert("eligibility_presets", eligibilityPresetRows);
+  } catch (err) {
+    // empty sync can soft-fail before migration; non-empty must surface
+    if (eligibilityPresetRows.length > 0) throw err;
+  }
   await upsert("applications", appRows);
   await upsert("exams", examRows);
   await upsert("attempts", attemptRows);
@@ -423,6 +454,14 @@ export async function writeDb(db: Database) {
   await deleteMissing("attempts", db.attempts.map((a) => a.id));
   await deleteMissing("applications", db.applications.map((a) => a.id));
   await deleteMissing("criteria", db.criteria.map((c) => c.id));
+  try {
+    await deleteMissing(
+      "eligibility_presets",
+      db.eligibilityPresets.map((p) => p.id)
+    );
+  } catch {
+    // table may not exist until migration is applied
+  }
   await deleteMissing("exams", db.exams.map((e) => e.id));
   await deleteMissing("notices", db.notices.map((n) => n.id));
   await deleteMissing("chat_rooms", db.chatRooms.map((r) => r.id));

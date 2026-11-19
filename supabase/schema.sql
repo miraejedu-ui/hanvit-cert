@@ -58,6 +58,14 @@ create table if not exists criteria (
   content text not null default '',
   file_name text,
   file_path text,
+  details jsonb default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists eligibility_presets (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  content text not null default '',
   created_at timestamptz not null default now()
 );
 
@@ -162,6 +170,7 @@ alter table job_fields enable row level security;
 alter table certifications enable row level security;
 alter table notices enable row level security;
 alter table criteria enable row level security;
+alter table eligibility_presets enable row level security;
 alter table applications enable row level security;
 alter table exams enable row level security;
 alter table attempts enable row level security;

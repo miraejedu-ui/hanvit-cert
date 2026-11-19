@@ -4,7 +4,11 @@ import { getSessionUser } from "@/lib/auth";
 
 export async function GET() {
   const db = await readDb();
-  return NextResponse.json({ majors: db.majors, jobFields: db.jobFields });
+  return NextResponse.json({
+    majors: db.majors,
+    jobFields: db.jobFields,
+    eligibilityPresets: db.eligibilityPresets,
+  });
 }
 
 export async function POST(req: Request) {
@@ -14,6 +18,7 @@ export async function POST(req: Request) {
   }
   const body = await req.json();
   const db = await readDb();
+
   if (body.type === "major") {
     const major = {
       id: uuid(),
@@ -27,6 +32,22 @@ export async function POST(req: Request) {
     await writeDb(db);
     return NextResponse.json({ major });
   }
+
+  if (body.type === "eligibilityPreset") {
+    const preset = {
+      id: uuid(),
+      name: String(body.name || "").trim(),
+      content: String(body.content || ""),
+      createdAt: new Date().toISOString(),
+    };
+    if (!preset.name) {
+      return NextResponse.json({ error: "이름을 입력하세요." }, { status: 400 });
+    }
+    db.eligibilityPresets.push(preset);
+    await writeDb(db);
+    return NextResponse.json({ eligibilityPreset: preset });
+  }
+
   const job = {
     id: uuid(),
     name: String(body.name || ""),
@@ -50,7 +71,9 @@ export async function DELETE(req: Request) {
   const id = searchParams.get("id");
   const db = await readDb();
   if (type === "major") db.majors = db.majors.filter((m) => m.id !== id);
-  else db.jobFields = db.jobFields.filter((j) => j.id !== id);
+  else if (type === "eligibilityPreset") {
+    db.eligibilityPresets = db.eligibilityPresets.filter((p) => p.id !== id);
+  } else db.jobFields = db.jobFields.filter((j) => j.id !== id);
   await writeDb(db);
   return NextResponse.json({ ok: true });
 }

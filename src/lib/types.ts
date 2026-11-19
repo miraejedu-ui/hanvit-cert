@@ -48,6 +48,36 @@ export interface Notice {
   createdAt: string;
 }
 
+export interface EligibilityPreset {
+  id: string;
+  name: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface ExamCriteriaWrittenDetails {
+  /** Fixed as "객관식" for written exams */
+  examMethod: string;
+  questionCount: number | string;
+  duration: string;
+  questionsPerSubject: number;
+}
+
+export interface ExamCriteriaPracticalDetails {
+  process: string;
+  examMethod: string;
+  duration: string;
+  /** Raw pasted TSV/CSV/lines text */
+  pasteRaw?: string;
+  tableRows?: string[][];
+}
+
+export interface ExamCriteriaDetails {
+  kind?: "written" | "practical";
+  written?: ExamCriteriaWrittenDetails;
+  practical?: ExamCriteriaPracticalDetails;
+}
+
 export interface ExamCriteria {
   id: string;
   certificationId: string;
@@ -56,6 +86,8 @@ export interface ExamCriteria {
   fileName?: string;
   filePath?: string;
   createdAt: string;
+  /** Structured fields; optional for legacy rows */
+  details?: ExamCriteriaDetails;
 }
 
 export type ApplicationStatus =
@@ -183,6 +215,7 @@ export interface Database {
   certifications: Certification[];
   notices: Notice[];
   criteria: ExamCriteria[];
+  eligibilityPresets: EligibilityPreset[];
   applications: Application[];
   exams: Exam[];
   attempts: ExamAttempt[];
