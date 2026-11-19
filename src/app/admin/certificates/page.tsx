@@ -134,7 +134,7 @@ export default function AdminCertificatesPage() {
           [
             ["name", "성명", "text"],
             ["birthDate", "생년월일", "date"],
-            ["phone", "번호 (영문·숫자·기호)", "text"],
+            ["phone", "번호", "tel"],
             ["issueDate", "발급일", "date"],
           ] as const
         ).map(([key, label, type]) => (

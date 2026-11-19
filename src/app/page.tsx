@@ -22,7 +22,7 @@ export default function HomePage() {
       >
         <div>
           <p style={{ margin: "0 0 0.6rem", letterSpacing: "0.12em", fontSize: "0.8rem", opacity: 0.85 }}>
-            HCAI · HANVIT CERTIFICATION & ASSESSMENT INSTITUTE
+            CERTIFICATION PORTAL
           </p>
           <h1
             style={{
@@ -33,10 +33,10 @@ export default function HomePage() {
               fontWeight: 900,
             }}
           >
-            한빛인증평가원
+            한빛자격정보원
           </h1>
           <p style={{ margin: "1rem 0 1.6rem", maxWidth: "34rem", lineHeight: 1.7, opacity: 0.92 }}>
-            종목 정보부터 응시자격 확인, 원서 접수, 온라인 시험까지 한곳에서 진행하세요.
+            자격증 정보부터 응시자격 확인, 원서 접수, 온라인 시험까지 한곳에서 진행하세요.
           </p>
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
             <Link
@@ -44,7 +44,7 @@ export default function HomePage() {
               className="btn"
               style={{ background: "#fff", color: "var(--navy)" }}
             >
-              종목 명칭 보기
+              자격증 정보 보기
             </Link>
             <Link
               href="/eligibility"
@@ -73,11 +73,11 @@ export default function HomePage() {
           }}
         >
           <div>
-            <div style={{ fontSize: "3rem", fontWeight: 900, letterSpacing: "-0.05em" }}>HCAI</div>
+            <div style={{ fontSize: "3rem", fontWeight: 900, letterSpacing: "-0.05em" }}>HANVIT</div>
             <p style={{ margin: "0.5rem 0 0", opacity: 0.85, lineHeight: 1.5 }}>
               신뢰할 수 있는
               <br />
-              인증·평가와 시험 응시
+              자격 정보와 시험 응시
             </p>
           </div>
         </div>
@@ -93,7 +93,7 @@ export default function HomePage() {
         }}
       >
         {[
-          { href: "/certifications", title: "종목 명칭", desc: "검색·주관기관·직무능력별 조회" },
+          { href: "/certifications", title: "자격증 정보", desc: "검색·주관기관·직무능력별 조회" },
           { href: "/apply", title: "원서 접수", desc: "로그인 후 종목 선택 및 서류 제출" },
           { href: "/notices", title: "공지사항", desc: "시험 일정과 안내 자료 확인" },
           { href: "/certificate/verify", title: "진위확인", desc: "발급 자격증 진위 여부 확인" },

@@ -9,13 +9,12 @@ export async function POST(req: Request) {
   const issueDate = String(body.issueDate || "").trim();
   const certificationName = String(body.certificationName || "").trim();
 
-  const normalizeCode = (v: string) => v.replace(/[\s-]/g, "").toUpperCase();
   const db = await readDb();
   const match = db.authenticity.find(
     (r) =>
       r.name === name &&
       r.birthDate === birthDate &&
-      normalizeCode(r.phone) === normalizeCode(phone) &&
+      r.phone.replace(/-/g, "") === phone.replace(/-/g, "") &&
       r.issueDate === issueDate &&
       r.certificationName === certificationName
   );

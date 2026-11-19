@@ -50,12 +50,11 @@ export default function AdminCriteriaPage() {
 
   return (
     <div className="container">
-      <h1 className="page-title">출제기준</h1>
-      <p className="page-desc">종목을 선택한 뒤 출제기준 내용·파일을 등록합니다. (개편 전 방식)</p>
+      <h1 className="page-title">출제기준 업로드</h1>
       <AdminNav />
       <form className="card-panel" onSubmit={onSubmit} style={{ marginBottom: "1rem" }}>
         <div className="field">
-          <label>종목 (검색·선택)</label>
+          <label>자격 종목 (검색·선택)</label>
           <SearchSelect
             options={certOptions}
             value={form.certificationId}

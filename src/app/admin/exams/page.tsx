@@ -223,10 +223,9 @@ export default function AdminExamsPage() {
 
   return (
     <div className="container">
-      <h1 className="page-title">시험 제작</h1>
+      <h1 className="page-title">시험 문항 제작·배포</h1>
       <p className="page-desc">
-        종목을 선택하면 등록된 시험과목이 모두 표시됩니다. 과목마다 문제유형·문항 수를 넣고 「기본 문항 생성」한 뒤
-        문제·보기를 작성하세요. (과목당 100점)
+        과목별로 문제유형·문항 수를 입력해 기본 문항을 만든 뒤, 문제와 보기만 작성하세요. 과목당 100점입니다.
       </p>
       <AdminNav />
 

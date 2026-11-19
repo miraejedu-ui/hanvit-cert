@@ -29,9 +29,9 @@ export async function Header() {
       >
         <Link href="/" style={{ display: "flex", alignItems: "baseline", gap: "0.45rem" }}>
           <span style={{ fontSize: "1.35rem", fontWeight: 900, color: "var(--navy)", letterSpacing: "-0.03em" }}>
-            한빛인증평가원
+            한빛자격정보원
           </span>
-          <span style={{ fontSize: "0.75rem", color: "var(--teal)", fontWeight: 700 }}>HCAI</span>
+          <span style={{ fontSize: "0.75rem", color: "var(--teal)", fontWeight: 700 }}>HANVIT</span>
         </Link>
 
         <nav
@@ -44,7 +44,7 @@ export async function Header() {
             color: "var(--muted)",
           }}
         >
-          <Link href="/certifications">종목 명칭</Link>
+          <Link href="/certifications">자격증 정보</Link>
           <Link href="/eligibility">응시자격 자가진단</Link>
           <Link href="/notices">공지</Link>
           <Link href="/criteria">출제기준</Link>

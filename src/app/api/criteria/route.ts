@@ -1,18 +1,6 @@
 import { NextResponse } from "next/server";
 import { readDb, writeDb, saveUpload, uuid } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
-import type { ExamCriteriaDetails } from "@/lib/types";
-
-function parseDetails(raw: FormDataEntryValue | null): ExamCriteriaDetails | undefined {
-  if (raw == null || raw === "") return undefined;
-  try {
-    const parsed = JSON.parse(String(raw));
-    if (!parsed || typeof parsed !== "object") return undefined;
-    return parsed as ExamCriteriaDetails;
-  } catch {
-    return undefined;
-  }
-}
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -44,7 +32,6 @@ export async function POST(req: Request) {
   const title = String(form.get("title") || "");
   const content = String(form.get("content") || "");
   const certificationId = String(form.get("certificationId") || "");
-  const details = parseDetails(form.get("details"));
   const file = form.get("file") as File | null;
   let fileName: string | undefined;
   let filePath: string | undefined;
@@ -62,7 +49,6 @@ export async function POST(req: Request) {
     fileName,
     filePath,
     createdAt: new Date().toISOString(),
-    ...(details ? { details } : {}),
   };
   db.criteria.push(item);
   await writeDb(db);

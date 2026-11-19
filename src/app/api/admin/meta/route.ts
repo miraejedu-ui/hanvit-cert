@@ -4,11 +4,7 @@ import { getSessionUser } from "@/lib/auth";
 
 export async function GET() {
   const db = await readDb();
-  return NextResponse.json({
-    majors: db.majors,
-    jobFields: db.jobFields,
-    eligibilityPresets: db.eligibilityPresets,
-  });
+  return NextResponse.json({ majors: db.majors, jobFields: db.jobFields });
 }
 
 export async function POST(req: Request) {
@@ -18,70 +14,28 @@ export async function POST(req: Request) {
   }
   const body = await req.json();
   const db = await readDb();
-
   if (body.type === "major") {
-    const relatedJobs = String(body.relatedJobs || "")
-      .split(",")
-      .map((s: string) => s.trim())
-      .filter(Boolean);
     const major = {
       id: uuid(),
       name: String(body.name || ""),
-      relatedJobs,
+      relatedJobs: String(body.relatedJobs || "")
+        .split(",")
+        .map((s: string) => s.trim())
+        .filter(Boolean),
     };
     db.majors.push(major);
-    for (const jobName of relatedJobs) {
-      const job = db.jobFields.find((j) => j.name === jobName);
-      if (job) {
-        job.relatedMajors = job.relatedMajors || [];
-        if (!job.relatedMajors.includes(major.name)) job.relatedMajors.push(major.name);
-      }
-    }
     await writeDb(db);
     return NextResponse.json({ major });
   }
-
-  if (body.type === "eligibilityPreset") {
-    const preset = {
-      id: uuid(),
-      name: String(body.name || "").trim(),
-      content: String(body.content || ""),
-      createdAt: new Date().toISOString(),
-    };
-    if (!preset.name) {
-      return NextResponse.json({ error: "이름을 입력하세요." }, { status: 400 });
-    }
-    db.eligibilityPresets.push(preset);
-    await writeDb(db);
-    return NextResponse.json({ eligibilityPreset: preset });
-  }
-
-  const relatedMajors = String(body.relatedMajors || "")
-    .split(",")
-    .map((s: string) => s.trim())
-    .filter(Boolean);
   const job = {
     id: uuid(),
     name: String(body.name || ""),
-    relatedMajors,
     similarJobs: String(body.similarJobs || "")
       .split(",")
       .map((s: string) => s.trim())
       .filter(Boolean),
   };
   db.jobFields.push(job);
-
-  // Keep major ↔ job links in sync when registering from 직무 side
-  for (const majorName of relatedMajors) {
-    let major = db.majors.find((m) => m.name === majorName);
-    if (!major) {
-      major = { id: uuid(), name: majorName, relatedJobs: [job.name] };
-      db.majors.push(major);
-    } else if (!major.relatedJobs.includes(job.name)) {
-      major.relatedJobs.push(job.name);
-    }
-  }
-
   await writeDb(db);
   return NextResponse.json({ jobField: job });
 }
@@ -96,9 +50,7 @@ export async function DELETE(req: Request) {
   const id = searchParams.get("id");
   const db = await readDb();
   if (type === "major") db.majors = db.majors.filter((m) => m.id !== id);
-  else if (type === "eligibilityPreset") {
-    db.eligibilityPresets = db.eligibilityPresets.filter((p) => p.id !== id);
-  } else db.jobFields = db.jobFields.filter((j) => j.id !== id);
+  else db.jobFields = db.jobFields.filter((j) => j.id !== id);
   await writeDb(db);
   return NextResponse.json({ ok: true });
 }

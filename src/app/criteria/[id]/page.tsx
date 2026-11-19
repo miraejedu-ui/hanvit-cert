@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { CriteriaView } from "@/components/CriteriaView";
 import { readDb } from "@/lib/db";
 import { notFound } from "next/navigation";
 
@@ -15,22 +14,18 @@ export default async function CriteriaDetailPage({
   const cert = db.certifications.find((c) => c.id === item.certificationId);
 
   return (
-    <div className="container" style={{ maxWidth: 960 }}>
+    <div className="container" style={{ maxWidth: 800 }}>
       <Link href="/criteria" style={{ color: "var(--muted)", fontSize: "0.9rem" }}>
         ← 목록
       </Link>
       <h1 className="page-title" style={{ marginTop: "0.75rem" }}>
         {item.title}
       </h1>
-      <p className="page-desc">
-        {cert ? (
-          <Link href={`/certifications/${cert.id}`} style={{ color: "var(--teal)" }}>
-            {cert.name}
-          </Link>
-        ) : null}
-      </p>
+      <p className="page-desc">{cert?.name}</p>
       <div className="card-panel">
-        <CriteriaView item={item} />
+        <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", margin: 0, lineHeight: 1.7 }}>
+          {item.content}
+        </pre>
         {item.filePath && (
           <p style={{ marginTop: "1.25rem" }}>
             <a className="btn btn-accent" href={`/api/upload?file=${encodeURIComponent(item.filePath)}`}>

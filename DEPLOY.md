@@ -5,7 +5,7 @@ PC가 꺼져 있어도 동작하고, 원서·시험·파일 데이터가 유지�
 ## 1. Supabase 프로젝트 만들기
 
 1. [https://supabase.com](https://supabase.com) 가입/로그인
-2. **New project** 생성 (이름 예: `hcai`, 비밀번호 저장)
+2. **New project** 생성 (이름 예: `hanvit`, 비밀번호 저장)
 3. 프로젝트 생성 완료 대기
 
 ## 2. 테이블 만들기
@@ -66,8 +66,7 @@ git push
    - `SUPABASE_SERVICE_ROLE_KEY`
 5. **Deploy**
 
-완료되면 `https://프로젝트명.vercel.app` 주소가 생깁니다.  
-현재 사이트 주소: [https://hanvitcai.vercel.app](https://hanvitcai.vercel.app) (프로젝트명 `hcai`)
+완료되면 `https://프로젝트명.vercel.app` 주소가 생깁니다.
 
 ## 8. 이후 업데이트
 
