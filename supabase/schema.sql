@@ -1,4 +1,4 @@
--- 한빛자격정보원 Supabase 스키마
+-- 한빛인증평가원 (HCAI) Supabase 스키마
 -- Supabase Dashboard → SQL Editor 에서 전체 실행
 
 create extension if not exists "pgcrypto";

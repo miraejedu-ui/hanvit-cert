@@ -20,7 +20,7 @@ export default async function AdminHome() {
   return (
     <div className="container">
       <h1 className="page-title">관리자</h1>
-      <p className="page-desc">한빛자격정보원 운영 관리 화면입니다.</p>
+      <p className="page-desc">한빛인증평가원(HCAI) 운영 관리 화면입니다.</p>
       <AdminNav />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "0.85rem" }}>
         {stats.map((s) => (

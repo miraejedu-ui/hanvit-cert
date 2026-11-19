@@ -1,6 +1,9 @@
-# 한빛자격정보원
+# 한빛인증평가원 (HCAI)
 
+Hanvit Certification & Assessment Institute  
 자격증 정보 안내 및 시험 응시 사이트입니다.
+
+- 사이트: [https://hcai.vercel.app](https://hcai.vercel.app)
 
 ## 실행 (로컬)
 

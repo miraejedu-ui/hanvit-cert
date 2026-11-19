@@ -22,7 +22,7 @@ export default function HomePage() {
       >
         <div>
           <p style={{ margin: "0 0 0.6rem", letterSpacing: "0.12em", fontSize: "0.8rem", opacity: 0.85 }}>
-            CERTIFICATION PORTAL
+            HCAI · HANVIT CERTIFICATION & ASSESSMENT INSTITUTE
           </p>
           <h1
             style={{
@@ -33,7 +33,7 @@ export default function HomePage() {
               fontWeight: 900,
             }}
           >
-            한빛자격정보원
+            한빛인증평가원
           </h1>
           <p style={{ margin: "1rem 0 1.6rem", maxWidth: "34rem", lineHeight: 1.7, opacity: 0.92 }}>
             자격증 정보부터 응시자격 확인, 원서 접수, 온라인 시험까지 한곳에서 진행하세요.
@@ -73,11 +73,11 @@ export default function HomePage() {
           }}
         >
           <div>
-            <div style={{ fontSize: "3rem", fontWeight: 900, letterSpacing: "-0.05em" }}>HANVIT</div>
+            <div style={{ fontSize: "3rem", fontWeight: 900, letterSpacing: "-0.05em" }}>HCAI</div>
             <p style={{ margin: "0.5rem 0 0", opacity: 0.85, lineHeight: 1.5 }}>
               신뢰할 수 있는
               <br />
-              자격 정보와 시험 응시
+              인증·평가와 시험 응시
             </p>
           </div>
         </div>

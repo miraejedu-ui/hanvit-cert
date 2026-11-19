@@ -29,9 +29,9 @@ export async function Header() {
       >
         <Link href="/" style={{ display: "flex", alignItems: "baseline", gap: "0.45rem" }}>
           <span style={{ fontSize: "1.35rem", fontWeight: 900, color: "var(--navy)", letterSpacing: "-0.03em" }}>
-            한빛자격정보원
+            한빛인증평가원
           </span>
-          <span style={{ fontSize: "0.75rem", color: "var(--teal)", fontWeight: 700 }}>HANVIT</span>
+          <span style={{ fontSize: "0.75rem", color: "var(--teal)", fontWeight: 700 }}>HCAI</span>
         </Link>
 
         <nav
